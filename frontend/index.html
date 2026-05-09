@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Daily Weather Summary</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f0f4f8; color: #1a202c; min-height: 100vh; padding: 2rem; }
+    nav { display: flex; gap: 1rem; margin-bottom: 1.5rem; }
+    nav a { text-decoration: none; padding: 0.4rem 1rem; border-radius: 8px; font-weight: 600; font-size: 0.9rem; background: #e2e8f0; color: #2d3748; }
+    nav a.active { background: #4299e1; color: white; }
+    h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+    p.subtitle { color: #718096; margin-bottom: 2rem; font-size: 0.95rem; }
+
+    .card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-bottom: 1.5rem; }
+
+    .input-row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+    input[type="text"] { flex: 1; padding: 0.6rem 1rem; border: 1px solid #cbd5e0; border-radius: 8px; font-size: 1rem; min-width: 180px; }
+    button { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: opacity .15s; }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #4299e1; color: white; }
+    .btn-secondary { background: #e2e8f0; color: #2d3748; }
+
+    .status { margin-top: 0.75rem; font-size: 0.9rem; min-height: 1.2rem; }
+    .status.ok  { color: #2f855a; }
+    .status.err { color: #c53030; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .stat { background: #ebf8ff; border-radius: 8px; padding: 1rem; text-align: center; }
+    .stat-value { font-size: 1.6rem; font-weight: 700; color: #2b6cb0; }
+    .stat-label { font-size: 0.75rem; color: #4a5568; margin-top: 0.25rem; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 1rem; }
+    th { text-align: left; padding: 0.6rem 0.75rem; background: #edf2f7; border-bottom: 2px solid #e2e8f0; }
+    td { padding: 0.55rem 0.75rem; border-bottom: 1px solid #e2e8f0; }
+    tr:last-child td { border-bottom: none; }
+    .rainy { color: #3182ce; }
+    .sunny { color: #d69e2e; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="active">🌤 Summary</a>
+  <a href="/cities-page">🏙 My Cities</a>
+</nav>
+
+<h1>🌤 Daily Weather Summary</h1>
+<p class="subtitle">Fetch and track daily forecasts per city.</p>
+
+<!-- City Picker -->
+<div class="card">
+  <div class="input-row">
+    <input type="text" id="cityInput" placeholder="Enter city name (e.g. London)" />
+    <button class="btn-primary" id="fetchBtn" onclick="fetchWeather()">Fetch Today's Data</button>
+    <button class="btn-secondary" id="viewBtn" onclick="loadSummaryAndHistory()">View Summary</button>
+  </div>
+  <div class="status" id="fetchStatus"></div>
+</div>
+
+<!-- Summary Stats -->
+<div class="card hidden" id="summaryCard">
+  <h2 id="summaryTitle" style="margin-bottom:0.25rem"></h2>
+  <p style="color:#718096;font-size:0.85rem" id="summarySubtitle"></p>
+  <div class="stats-grid" id="statsGrid"></div>
+</div>
+
+<!-- History Table -->
+<div class="card hidden" id="historyCard">
+  <h2>History</h2>
+  <table id="historyTable">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Morning (°F)</th>
+        <th>Night (°F)</th>
+        <th>Diff (°F)</th>
+        <th>Rain</th>
+      </tr>
+    </thead>
+    <tbody id="historyBody"></tbody>
+  </table>
+</div>
+
+<script>
+  const API = "";   // same origin
+
+  function city() {
+    return document.getElementById("cityInput").value.trim();
+  }
+
+  function setStatus(msg, type = "ok") {
+    const el = document.getElementById("fetchStatus");
+    el.textContent = msg;
+    el.className = "status " + type;
+  }
+
+  async function fetchWeather() {
+    if (!city()) return setStatus("Please enter a city name.", "err");
+    setStatus("Fetching…");
+    document.getElementById("fetchBtn").disabled = true;
+    try {
+      const res = await fetch(`${API}/weather/fetch?city=${encodeURIComponent(city())}`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "Unknown error");
+      const r = data.record;
+      setStatus(`✅ Saved data for ${r.city} on ${r.date} — Morning: ${r.morning_temp}°C | Night: ${r.night_temp}°C | ${r.is_rainy ? "🌧 Rainy" : "☀️ Dry"}`, "ok");
+      loadSummaryAndHistory();
+    } catch (e) {
+      setStatus("❌ " + e.message, "err");
+    } finally {
+      document.getElementById("fetchBtn").disabled = false;
+    }
+  }
+
+  async function loadSummaryAndHistory() {
+    if (!city()) return setStatus("Please enter a city name.", "err");
+    const [sumRes, histRes] = await Promise.all([
+      fetch(`${API}/weather/summary?city=${encodeURIComponent(city())}`),
+      fetch(`${API}/weather/history?city=${encodeURIComponent(city())}`),
+    ]);
+
+    if (!sumRes.ok) {
+      const err = await sumRes.json();
+      return setStatus("❌ " + (err.detail || "No data found"), "err");
+    }
+
+    const sum  = await sumRes.json();
+    const hist = await histRes.json();
+
+    // Summary card
+    document.getElementById("summaryTitle").textContent = `📊 ${city()} — Summary`;
+    document.getElementById("summarySubtitle").textContent = `Based on ${sum.total_days} recorded day(s)`;
+    document.getElementById("statsGrid").innerHTML = `
+      <div class="stat"><div class="stat-value">${sum.rainy_days}</div><div class="stat-label">Rainy Days</div></div>
+      <div class="stat"><div class="stat-value">${sum.rainy_pct}%</div><div class="stat-label">% Rainy Days</div></div>
+      <div class="stat"><div class="stat-value">${sum.avg_temp_diff ?? "—"}°F</div><div class="stat-label">Avg Morn–Night Diff</div></div>
+      <div class="stat"><div class="stat-value">${sum.avg_morning_temp ?? "—"}°F</div><div class="stat-label">Avg Morning Temp</div></div>
+      <div class="stat"><div class="stat-value">${sum.avg_night_temp ?? "—"}°F</div><div class="stat-label">Avg Night Temp</div></div>
+    `;
+    document.getElementById("summaryCard").classList.remove("hidden");
+
+    // History table
+    document.getElementById("historyBody").innerHTML = hist.map(r => `
+      <tr>
+        <td>${r.date}</td>
+        <td>${r.morning_temp ?? "—"}</td>
+        <td>${r.night_temp ?? "—"}</td>
+        <td>${r.temp_diff ?? "—"}</td>
+        <td class="${r.is_rainy ? "rainy" : "sunny"}">${r.is_rainy ? "🌧 Yes" : "☀️ No"}</td>
+      </tr>
+    `).join("");
+    document.getElementById("historyCard").classList.remove("hidden");
+  }
+</script>
+</body>
+</html>
