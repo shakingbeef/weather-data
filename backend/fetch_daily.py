@@ -10,7 +10,7 @@ WEATHER_CITIES environment variable (comma-separated city names).
 
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 
 from database import init_db, get_connection
 from weather import fetch_forecast
@@ -35,7 +35,7 @@ def get_cities() -> list[str]:
 def fetch_and_store(city: str) -> dict:
     """Fetch today's forecast for *city* and upsert into the database."""
     record = fetch_forecast(city)
-    record["fetched_at"] = datetime.utcnow().isoformat()
+    record["fetched_at"] = datetime.now(timezone.utc).isoformat()
 
     with get_connection() as conn:
         conn.execute(
