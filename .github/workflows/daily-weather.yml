@@ -1,0 +1,43 @@
+name: Daily Weather Fetch
+
+on:
+  schedule:
+    # Runs every day at 06:00 UTC
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      cities:
+        description: "Comma-separated list of cities (overrides tracked cities)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch weather data
+        working-directory: backend
+        env:
+          WEATHER_CITIES: ${{ github.event.inputs.cities || vars.WEATHER_CITIES || '' }}
+        run: python fetch_daily.py
+
+      - name: Upload database artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: weather-db-${{ github.run_id }}
+          path: weather.db
+          retention-days: 90
